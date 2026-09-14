@@ -1,0 +1,8 @@
+node_modules/
+medfit.db
+medfit.db-shm
+medfit.db-wal
+notifications.log
+server.log
+private_uploads/
+.env

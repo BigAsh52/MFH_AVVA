@@ -1,0 +1,9 @@
+{
+  "name": "Avva by MedFit",
+  "short_name": "Avva",
+  "start_url": "/app/index.html",
+  "display": "standalone",
+  "background_color": "#f4f8fa",
+  "theme_color": "#0092ca",
+  "icons": []
+}

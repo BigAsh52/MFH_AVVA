@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedFit Employer Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="page-head">
+    <div>
+      <div class="eyebrow">MedFit for Employers · Avva Program</div>
+      <h1 id="employerName">Engagement Console</h1>
+    </div>
+    <div style="color:var(--text-muted); font-size:0.85rem;">Program-to-date, updated live</div>
+  </header>
+
+  <div class="kpi-grid">
+    <div class="kpi-tile"><div class="label">Participants</div><div class="value" id="kpiMembers">—</div><div class="sub">enrolled in lifestyle program</div></div>
+    <div class="kpi-tile"><div class="label">Active last 7 days</div><div class="value good" id="kpiParticipation">—</div><div class="sub" id="kpiParticipationSub"></div></div>
+    <div class="kpi-tile"><div class="label">Avg. engagement score</div><div class="value" id="kpiEngagement">—</div><div class="sub" id="kpiEngagementSub">0-100, food logging + weigh-ins + recency</div></div>
+    <div class="kpi-tile"><div class="label">Needs attention</div><div class="value" id="kpiAttention">—</div><div class="sub" id="kpiAttentionSub"></div></div>
+    <div class="kpi-tile"><div class="label">Avg. weight change</div><div class="value good" id="kpiWeight">—</div><div class="sub">vs. program start</div></div>
+    <div class="kpi-tile"><div class="label">Avg. BMI</div><div class="value" id="kpiBmi">—</div><div class="sub" id="kpiBmiSub">vs. program start</div></div>
+    <div class="kpi-tile"><div class="label">Workouts logged</div><div class="value" id="kpiWorkouts">—</div><div class="sub">program-to-date</div></div>
+  </div>
+
+  <div class="panel insights-panel">
+    <h2>Coaching insights</h2>
+    <h3>What I notice</h3>
+    <ul id="whatINotice"></ul>
+    <h3>Next best actions</h3>
+    <div id="nextBestActions"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Weekly engagement volume</h2>
+    <div class="chart-wrap" id="trendChart"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Group average BMI trend</h2>
+    <p style="color:var(--text-muted); font-size:0.82rem; margin-top:-6px;">A screening indicator, not a diagnosis — shown as a group average.</p>
+    <div class="chart-wrap" id="bmiTrendChart"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Participant roster</h2>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name">Name</th>
+          <th data-sort="status">Status</th>
+          <th data-sort="engagement_score">Engagement</th>
+          <th data-sort="weight_change_pct">Weight change</th>
+          <th data-sort="body_fat_change">Body fat change</th>
+          <th data-sort="bmi_current">BMI</th>
+          <th data-sort="engagement_count">Engagements</th>
+          <th data-sort="last_engagement">Last activity</th>
+        </tr>
+      </thead>
+      <tbody id="rosterBody"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop" hidden>
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

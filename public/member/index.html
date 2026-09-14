@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Avva by MedFit</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="topbar">
+    <div class="eyebrow">Avva · by MedFit</div>
+    <h1 id="greeting">Welcome back</h1>
+  </div>
+
+  <!-- HOME -->
+  <section class="screen" id="screen-home">
+    <div class="card">
+      <span class="pill" id="weekPill">Week 1 · Liver-Support Reset</span>
+    </div>
+    <div class="card" id="todayCard" hidden>
+      <h3 id="todayCardTitle">Today</h3>
+      <p id="todayCardMessage" style="margin:0 0 10px;"></p>
+      <button class="btn secondary" id="todayCardAction" style="display:none;"></button>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="label">Current weight</div>
+        <div class="value" id="statWeight">—</div>
+      </div>
+      <div class="stat-tile">
+        <div class="label">Weight change</div>
+        <div class="value" id="statWeightChange">—</div>
+      </div>
+      <div class="stat-tile">
+        <div class="label">Body fat</div>
+        <div class="value" id="statBodyFat">—</div>
+      </div>
+      <div class="stat-tile">
+        <div class="label">BMI</div>
+        <div class="value" id="statBmi">—</div>
+        <div class="badge-live" id="statBmiCategory"></div>
+      </div>
+      <div class="stat-tile">
+        <div class="label">Workouts this week</div>
+        <div class="value" id="statWorkouts">—</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Ask your coach</h3>
+      <div class="suggestion-row">
+        <button class="suggestion-chip" data-ask="What's my grocery list for this week?">This week's grocery list</button>
+        <button class="suggestion-chip" data-ask="Give me a good shake recipe for today.">Today's shake</button>
+        <button class="suggestion-chip" data-ask="What's a good dinner recipe tonight?">Tonight's dinner</button>
+      </div>
+      <button class="btn secondary" style="margin-top:10px" onclick="goTo('coach')">Open Coach chat →</button>
+    </div>
+    <div class="card">
+      <h3>Recent activity</h3>
+      <div id="recentActivity"><p class="badge-live">Nothing logged yet — head to Log to get started.</p></div>
+    </div>
+    <div class="card">
+      <h3>Trusted resources</h3>
+      <p class="badge-live" style="margin-bottom:8px;">Curated recipe and workout sources — not written by MedFit</p>
+      <div id="resourceList"></div>
+    </div>
+  </section>
+
+  <!-- COACH -->
+  <section class="screen" id="screen-coach" hidden>
+    <div id="chatLog"></div>
+  </section>
+
+  <!-- LOG -->
+  <section class="screen" id="screen-log" hidden>
+    <div class="tabs">
+      <button class="tab-btn active" data-logtab="meal">Meal</button>
+      <button class="tab-btn" data-logtab="workout">Workout</button>
+      <button class="tab-btn" data-logtab="vitals">Vitals</button>
+    </div>
+
+    <form id="form-meal" class="card">
+      <div class="field">
+        <label>What did you eat?</label>
+        <input type="text" name="description" placeholder="e.g. Grilled chicken, broccoli, quinoa" required>
+      </div>
+      <div class="field">
+        <label>Meal</label>
+        <select name="meal_type">
+          <option value="breakfast">Breakfast</option>
+          <option value="lunch">Lunch</option>
+          <option value="dinner">Dinner</option>
+          <option value="snack">Snack</option>
+        </select>
+      </div>
+      <div class="field"><label>Photo (optional)</label><input type="file" name="photo" accept="image/*" capture="environment"></div>
+      <div style="display:flex; gap:8px;">
+        <div class="field" style="flex:1"><label>Calories</label><input type="number" name="calories" placeholder="420"></div>
+        <div class="field" style="flex:1"><label>Protein (g)</label><input type="number" name="protein_g" placeholder="38"></div>
+      </div>
+      <button class="btn" type="submit">Log meal</button>
+    </form>
+
+    <form id="form-workout" class="card" hidden>
+      <div class="field">
+        <label>Activity</label>
+        <input type="text" name="workout_type" placeholder="e.g. Brisk walk, resistance training" required>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select name="category">
+          <option value="cardio">Cardio</option>
+          <option value="resistance">Resistance training</option>
+          <option value="flexibility">Flexibility / mobility</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <div class="field" style="flex:1"><label>Duration (min)</label><input type="number" name="duration_min" placeholder="30"></div>
+        <div class="field" style="flex:1">
+          <label>Intensity</label>
+          <select name="intensity">
+            <option value="light">Light</option>
+            <option value="moderate" selected>Moderate</option>
+            <option value="vigorous">Vigorous</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" type="submit">Log workout</button>
+    </form>
+
+    <form id="form-vitals" class="card" hidden>
+      <div class="field"><label>Weight (lbs)</label><input type="number" step="0.1" name="weight_lbs" placeholder="212.4"></div>
+      <div class="field"><label>Body fat (%)</label><input type="number" step="0.1" name="body_fat_pct" placeholder="33.5"></div>
+      <div class="field"><label>Muscle mass (lbs)</label><input type="number" step="0.1" name="muscle_mass_lbs" placeholder="128"></div>
+      <button class="btn" type="submit">Log vitals</button>
+    </form>
+
+    <div class="card">
+      <h3>Recent logs</h3>
+      <div id="logHistory"></div>
+    </div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section class="screen" id="screen-progress" hidden>
+    <div class="card">
+      <h3>Weight trend</h3>
+      <div class="chart-wrap" id="weightChart"></div>
+    </div>
+    <div class="card">
+      <h3>Body fat trend</h3>
+      <div class="chart-wrap" id="fatChart"></div>
+    </div>
+    <div class="card">
+      <h3>Progress photos</h3>
+      <p class="badge-live" style="margin-bottom:10px;">Private to you — never visible to your employer.</p>
+      <div id="photoGallery" class="photo-gallery"></div>
+      <label class="btn secondary" style="margin-top:10px; display:block; text-align:center; cursor:pointer;">
+        Add this month's photo
+        <input type="file" id="monthlyPhotoInput" accept="image/*" capture="environment" style="display:none;">
+      </label>
+    </div>
+  </section>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-nav="home"><span class="icon">🏠</span>Home</button>
+    <button class="nav-btn" data-nav="coach"><span class="icon">💬</span>Coach</button>
+    <button class="nav-btn" data-nav="log"><span class="icon">📝</span>Log</button>
+    <button class="nav-btn" data-nav="progress"><span class="icon">📈</span>Progress</button>
+  </nav>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

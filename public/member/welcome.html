@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome to Avva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+  <div class="center-page" id="content">
+    <div>
+      <div class="eyebrow" style="color:var(--primary); font-weight:600; letter-spacing:.08em; text-transform:uppercase; font-size:.75rem;">Avva · by MedFit</div>
+      <h1 style="font-family:var(--font-display); font-size:1.6rem; margin:8px 0 6px;">Setting up your coach…</h1>
+      <p id="msg" style="color:var(--text-muted)">One moment.</p>
+    </div>
+  </div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('t');
+  const msg = document.getElementById('msg');
+  const content = document.getElementById('content');
+
+  if (!token) {
+    msg.textContent = 'This link is missing its access code — please use the link from your welcome email or text.';
+  } else {
+    fetch('/api/members/resolve/' + token)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        localStorage.setItem('medfit_member_id', data.id);
+        localStorage.setItem('medfit_member_name', data.name);
+        const nextHref = data.onboarding_completed ? 'index.html' : 'onboarding.html';
+        const nextLabel = data.onboarding_completed ? 'Open my app' : 'Set up my profile';
+        const bodyCopy = data.onboarding_completed
+          ? 'Avva is ready — grocery lists, recipes, and progress tracking for your reset, all in one place.'
+          : "First, let's capture your starting point — a couple of quick questions so your progress tracking has something to measure against.";
+        content.innerHTML = `
+          <div>
+            <div style="font-size:2.4rem; margin-bottom:8px;">👋</div>
+            <h1 style="font-family:var(--font-display); font-size:1.6rem; margin:0 0 10px;">Welcome, ${data.name.split(' ')[0]}</h1>
+            <p style="color:var(--text-muted); margin-bottom:20px;">${bodyCopy}</p>
+            <a class="btn" href="${nextHref}" style="text-decoration:none;">${nextLabel}</a>
+          </div>`;
+      })
+      .catch(() => {
+        msg.textContent = "We couldn't find an account for this link. It may have expired — reach out to your MedFit team.";
+      });
+  }
+</script>
+</body>
+</html>

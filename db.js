@@ -1,0 +1,150 @@
+const path = require('path');
+const Database = require('better-sqlite3');
+
+const db = new Database(path.join(__dirname, 'medfit.db'));
+db.pragma('journal_mode = WAL');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS employers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  glp_benefit_note TEXT
+);
+
+CREATE TABLE IF NOT EXISTS members (
+  id TEXT PRIMARY KEY,
+  employer_id TEXT REFERENCES employers(id),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  diet_style TEXT DEFAULT 'metabolism-reset',
+  program_start_date TEXT,
+  starting_weight_lbs REAL,
+  starting_body_fat_pct REAL,
+  status TEXT DEFAULT 'active',
+  signup_token TEXT,
+  gender TEXT,
+  age INTEGER,
+  height_in REAL,
+  starting_muscle_mass_lbs REAL,
+  starting_waist_in REAL,
+  resting_heart_rate_bpm REAL,
+  activity_level TEXT,
+  dietary_preferences TEXT,
+  goal_weight_lbs REAL,
+  onboarding_completed_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS vitals (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  date TEXT NOT NULL,
+  weight_lbs REAL,
+  body_fat_pct REAL,
+  muscle_mass_lbs REAL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS meals (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  date TEXT NOT NULL,
+  meal_type TEXT,
+  description TEXT,
+  calories REAL,
+  protein_g REAL,
+  carbs_g REAL,
+  fat_g REAL,
+  photo_note TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS workouts (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  date TEXT NOT NULL,
+  workout_type TEXT,
+  category TEXT,
+  duration_min REAL,
+  intensity TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  role TEXT,
+  content TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS engagements (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  type TEXT NOT NULL,
+  summary TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Progress photos are member-private. Nothing in routes/employer.js should
+-- ever query this table or reference file_path/photo ids in any response —
+-- see the comment at the top of routes/employer.js.
+CREATE TABLE IF NOT EXISTS progress_photos (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  photo_type TEXT NOT NULL, -- 'baseline' | 'monthly'
+  taken_on TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  mime_type TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Idempotency for inbound checkout-platform webhooks (Remedora retries a
+-- delivery up to 4 times with the same delivery_id on a non-2xx response).
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id TEXT PRIMARY KEY, -- "<source>:<delivery_id>"
+  source TEXT NOT NULL,
+  delivery_id TEXT NOT NULL,
+  event TEXT,
+  received_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Tracks which of the 30-day Reset check-in messages (lib/dailyMessages.js)
+-- have already gone out to each member, so the daily send script (see
+-- send-daily-messages.js) is safe to run more than once on the same day.
+-- Deliberately NOT the same as the engagements table above — a system-sent
+-- message isn't a member action and shouldn't feed the employer
+-- engagement-score/recency calculation (see lib/engagement.js).
+CREATE TABLE IF NOT EXISTS daily_message_log (
+  id TEXT PRIMARY KEY, -- "<member_id>:<day>"
+  member_id TEXT REFERENCES members(id),
+  day INTEGER NOT NULL,
+  sent_at TEXT DEFAULT (datetime('now'))
+);
+`);
+
+// Idempotent migration for databases created before the baseline-intake
+// fields existed. Each ADD COLUMN is wrapped individually so re-running is
+// harmless once the columns are already there.
+const MEMBER_COLUMNS_MIGRATION = [
+  'ALTER TABLE members ADD COLUMN gender TEXT',
+  'ALTER TABLE members ADD COLUMN age INTEGER',
+  'ALTER TABLE members ADD COLUMN height_in REAL',
+  'ALTER TABLE members ADD COLUMN starting_muscle_mass_lbs REAL',
+  'ALTER TABLE members ADD COLUMN starting_waist_in REAL',
+  'ALTER TABLE members ADD COLUMN resting_heart_rate_bpm REAL',
+  'ALTER TABLE members ADD COLUMN activity_level TEXT',
+  'ALTER TABLE members ADD COLUMN dietary_preferences TEXT',
+  'ALTER TABLE members ADD COLUMN goal_weight_lbs REAL',
+  'ALTER TABLE members ADD COLUMN onboarding_completed_at TEXT',
+];
+for (const stmt of MEMBER_COLUMNS_MIGRATION) {
+  try {
+    db.exec(stmt);
+  } catch (err) {
+    if (!/duplicate column/i.test(err.message)) throw err;
+  }
+}
+
+module.exports = db;
