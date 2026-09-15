@@ -1,7 +1,11 @@
 const path = require('path');
 const Database = require('better-sqlite3');
 
-const db = new Database(path.join(__dirname, 'medfit.db'));
+// In production (Render), DATA_DIR points at the mounted persistent disk
+// (/var/data) so the database survives deploys. Without it (local dev),
+// the db file just lives next to the code like before.
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+const db = new Database(path.join(DATA_DIR, 'medfit.db'));
 db.pragma('journal_mode = WAL');
 
 db.exec(`
