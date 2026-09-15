@@ -58,6 +58,27 @@ in this repo runs — real backend, real database, real screens — not a mockup
 - MedFit brand color (`#0092CA`, extracted from the MedFit Health logo) applied
   as the primary color token across both the member app and employer console,
   in both light and dark mode.
+- **Staff admin panel** (`/admin/`) with real individual staff logins (not the
+  member signup link): create/edit employer groups, tag any member as
+  belonging to a specific employer group or to a pooled **Direct Consumers**
+  group (self-pay members with no employer sponsor, reviewed the same way an
+  employer's roster is, internally only), manually invite someone by email/
+  text without waiting on a Remedora checkout, resend a lost link, and add
+  more staff accounts. The employer console (`/employer/`) now requires this
+  same staff login too — it used to be reachable by anyone with the URL.
+- **Avva is installable** ("Add to Home Screen") on both iPhone and Android —
+  real app icon (`public/member/icons/`), manifest, and a service worker. See
+  "Getting Avva onto a phone" below for what that means since it isn't an App
+  Store / Play Store app.
+- **A public "Get the App" page** (`/get-app.html`) for linking from
+  medfit.health — explains the install, and lets an existing member re-request
+  their personal app link by email/phone if they lost it.
+- **Coach answers beyond the built-in knowledge base**: for anything outside
+  the scripted grocery/shake/dinner/workout topics, the coach searches a
+  curated allowlist of trusted clinical sources first (Mayo Clinic, Cleveland
+  Clinic, Harvard Health, Johns Hopkins, NIH, CDC, MedlinePlus, ACE Fitness)
+  and only falls back to the open web if that turns up nothing — see
+  `lib/webKnowledge.js`.
 
 ## Open question: employer attribution in Remedora's webhook
 
@@ -83,7 +104,7 @@ know, I can make this exact instead of best-effort.
 | Piece | Right now | Goes live when you add |
 |---|---|---|
 | AI coach chat | Scripted answers for grocery lists, shake/dinner recipes, restaurant guidance | `ANTHROPIC_API_KEY` in `.env` |
-| Restaurant/menu live lookups | Coach reasons from general knowledge | `SERPER_API_KEY` (or swap in another search API in `lib/coachEngine.js`) |
+| Restaurant/menu live lookups, and any question outside the built-in topics | Coach reasons from general knowledge (or, with only `SERPER_API_KEY` and no `ANTHROPIC_API_KEY`, returns raw trusted-source/web links without a conversational answer) | `SERPER_API_KEY` (or swap in another search API in `lib/webKnowledge.js`) |
 | Welcome email | Logged to `notifications.log`, link still generated and returned by the API | `SENDGRID_API_KEY` |
 | Welcome text | Logged to `notifications.log` | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER` |
 | Checkout webhook signature | Accepted unverified, with a console warning (dev mode) | `REMEDORA_SIGNING_SECRET` (from Remedora's dashboard) |
@@ -101,7 +122,21 @@ npm start         # http://localhost:3210
 
 - Member app: `/app/?demo=<member_id>` (the seed script prints a sample id),
   or the real flow via `/app/welcome.html?t=<signup_token>`
-- Employer console: `/employer/?employer=demo-employer`
+- Employer console: `/employer/?employer=demo-employer` (requires staff login)
+- Staff admin: `/admin/` (requires staff login)
+- Get the app (public): `/get-app.html`
+
+`npm run seed` also creates a demo staff login so `/admin/` and `/employer/`
+work immediately: **demo@medfit.health / avva-demo-2026**. For a real
+deployment, create your own first account instead —
+`node create-admin.js "Your Name" you@medfit.health "a strong password"` —
+and, once you're logged in, add teammates from the Admin panel's Staff tab
+rather than the command line.
+
+**Important once this holds real staff accounts / real members**: stop
+running `seed.js` on every boot (it wipes and regenerates all employers and
+members every time it runs). That's a demo-only convenience — see the note in
+the "Hosting" section of the project doc / your deploy notes.
 
 Test the webhook locally with a correctly signed request:
 
@@ -160,6 +195,58 @@ each dashboard load — a couple of "what I notice" observations (e.g. how many
 members haven't weighed in recently) and a "next best actions" list of
 whoever most needs outreach, with a plain-language reason. Nothing here is
 hardcoded copy; all of it comes straight from that dashboard's own data.
+
+## Staff admin — accounts, employer groups & direct consumers
+
+`/admin/` is staff-only (real login, `admin_users` table, session cookie
+backed by a `sessions` table so it survives a restart — see `lib/auth.js`).
+It's also the login for `/employer/`, which used to have no auth at all.
+
+- **Employer groups**: create/rename groups, see member counts, jump to any
+  group's console.
+- **Direct Consumers**: a single pooled group (`employers.is_direct_consumer`)
+  for self-pay members with no employer sponsor. They get the same
+  engagement-console treatment as a real employer's roster, but it's reviewed
+  internally by MedFit staff only — a direct consumer never sees this
+  dashboard themselves.
+- **Members**: search everyone across every group, reassign anyone to a
+  different group (or to Direct Consumers) with one dropdown — this is also
+  how you fix a Remedora signup that guessed the wrong employer (see "Open
+  question" above), resend a lost signup link, or manually invite someone by
+  email/text who isn't coming through a Remedora checkout at all (a phone
+  signup, a walk-in, a direct consumer).
+- **Staff**: add more staff accounts once you're logged in — no shell access
+  needed after the first one.
+
+Not in this build yet: roles/permissions (every staff account can do
+everything above), and rate-limiting on the login endpoint — worth adding
+before this is handling a real staff roster at scale.
+
+## Getting Avva onto a phone (PWA, no App Store)
+
+Avva is a web app, not a native iOS/Android app, so there's nothing to
+publish to the App Store or Google Play. What it *can* do — and now does — is
+install like one: `public/member/manifest.json` + real icons
+(`public/member/icons/`, a placeholder monogram in MedFit blue — swap in a
+real logo mark whenever you have one) + a service worker
+(`public/member/sw.js`) mean a member can add it to their Home Screen on
+either iPhone or Android and get a proper full-screen app icon, no browser
+chrome, indistinguishable at a glance from a native app.
+
+Two ways someone gets there:
+1. **Their personal link** (from the Remedora welcome email/text, or a staff
+   manual invite) — opening it in Safari/Chrome and adding it to their Home
+   Screen is the real flow.
+2. **`/get-app.html`** — a public page for linking from medfit.health.
+   Explains the install, and has a "lost my link" form
+   (`POST /api/members/resend-link`) that re-sends an existing member's link
+   by email or phone without revealing whether that email/phone is enrolled
+   either way.
+
+`public/member/pwa-install.js` shows a small in-app banner prompting the
+install on first visit (Android fires a real `beforeinstallprompt`; iOS
+Safari never does, so it gets static "tap Share → Add to Home Screen"
+instructions instead) — dismissible, and it won't nag again for two weeks.
 
 ## Photo privacy — a hard boundary, by design
 
@@ -235,9 +322,14 @@ color.
 
 ## What's not in this build (real gaps, not code problems)
 
-- **Auth**: the signup-token link is the only access control right now. A
-  production version needs real session/auth (e.g. magic-link + short-lived
-  session cookie), especially given this handles health data.
+- **Member-side auth**: a member's access is still just their one-time
+  signup-token link (by design — it's a low-friction enrollment flow), not a
+  password/session. Staff-side auth (`/admin/`, `/employer/`) is real now —
+  see "Staff admin" above. If a member's link setup ever needs to be more
+  than that (e.g. a returning member on a new device), it'll need its own
+  proper login.
+- **Admin roles/permissions**: every staff account can do everything in
+  `/admin/` — no "read-only" or "employer-scoped" staff role yet.
 - **Automated food-photo → calories/macros**: the meal photo upload is stored
   as a note; automatic nutrition estimation from a photo needs a vision/
   nutrition API (e.g. a food-recognition service) wired into
@@ -253,24 +345,31 @@ color.
 ## Project layout
 
 ```
-server.js              Express app, route mounting, raw-body capture for webhook signatures
-db.js                  SQLite schema
+server.js              Express app, route mounting, staff-auth gating, raw-body capture for webhook signatures
+db.js                  SQLite schema (+ the Direct Consumers bucket bootstrap)
+create-admin.js         One-time CLI bootstrap for the first staff account
 routes/checkout.js      Remedora webhook -> member creation + welcome send
-routes/members.js       Member profile/summary
+routes/members.js       Member profile/summary + public resend-link
 routes/engagement.js    Meal / workout / vitals logging
 routes/coach.js         AI coach chat endpoint + resource library
-routes/employer.js      Aggregate dashboard + per-member drill-down (never touches photos)
+routes/employer.js      Aggregate dashboard + per-member drill-down (never touches photos) — staff-only
+routes/admin.js         Staff login + employer groups + cross-employer member roster/invite/reassign
 routes/photos.js        Private progress-photo upload/serving
-lib/notify.js           Email/SMS senders (simulate when keys are absent)
+lib/auth.js              Staff password hashing + DB-backed sessions + auth middleware
+lib/welcome.js           Shared "send the app link" — used by checkout.js and admin.js
+lib/notify.js            Email/SMS senders (simulate when keys are absent)
 lib/coachEngine.js       Claude API integration + scripted fallback
+lib/webKnowledge.js      Trusted-allowlist-first / open-web-fallback external Q&A search
 lib/framework.js         Original diet/recipe program content (see Content note)
 lib/resources.js         Curated external recipe/workout sources
 lib/remedora.js          Webhook signature verification + payload mapping
 lib/health.js            BMI calculation
 lib/engagement.js        Engagement score + coaching-insights generation
 lib/dailyMessages.js     30-day Reset check-in message series
-public/member/          Member-facing web app "Avva" (mobile-first)
-public/employer/        Employer engagement console
-seed.js                 Demo data generator (participants + demo progress photos)
+public/member/          Member-facing web app "Avva" (mobile-first) + manifest/icons/service worker
+public/employer/        Employer engagement console (staff-only)
+public/admin/           Staff admin panel + shared staff login page
+public/site/get-app.html Public "get the app" / lost-link page, for linking from medfit.health
+seed.js                 Demo data generator (participants, demo photos, demo staff login)
 send-daily-messages.js  Daily check-in email/SMS sender (run via cron)
 ```

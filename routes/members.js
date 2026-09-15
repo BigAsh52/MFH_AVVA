@@ -3,8 +3,30 @@ const { nanoid } = require('nanoid');
 const db = require('../db');
 const { computeBmi, bmiCategory } = require('../lib/health');
 const { getDailyMessage, dayNumberFor } = require('../lib/dailyMessages');
+const { sendWelcomeLink } = require('../lib/welcome');
 
 const router = express.Router();
+
+// Public, unauthenticated "I lost my link" resend — used by the Get the App
+// page linked from medfit.health. Always returns the same generic message
+// regardless of whether a match was found, so this can't be used to probe
+// whether a given email/phone is enrolled.
+router.post('/resend-link', async (req, res) => {
+  const { email, phone } = req.body || {};
+  const contact = (email || '').trim() || (phone || '').trim();
+  if (!contact) return res.status(400).json({ error: 'email or phone is required' });
+
+  const member = email
+    ? db.prepare('SELECT * FROM members WHERE lower(email) = lower(?) AND status = ?').get(email.trim(), 'active')
+    : db.prepare('SELECT * FROM members WHERE phone = ? AND status = ?').get(phone.trim(), 'active');
+
+  if (member) {
+    await sendWelcomeLink({ req, name: member.name, email: member.email, phone: member.phone, signupToken: member.signup_token });
+  }
+
+  // Same response either way — see comment above.
+  res.json({ ok: true, message: "If we found an account for that email or phone, we've sent your app link." });
+});
 
 router.get('/resolve/:token', (req, res) => {
   const member = db.prepare('SELECT * FROM members WHERE signup_token = ?').get(req.params.token);

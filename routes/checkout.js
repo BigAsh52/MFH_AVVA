@@ -1,7 +1,7 @@
 const express = require('express');
 const { nanoid } = require('nanoid');
 const db = require('../db');
-const { sendEmail, sendSms } = require('../lib/notify');
+const { sendWelcomeLink } = require('../lib/welcome');
 const { verifySignature, mapCheckoutCompleted } = require('../lib/remedora');
 
 const router = express.Router();
@@ -112,24 +112,13 @@ router.post('/webhook', async (req, res) => {
     signup_token,
   });
 
-  const baseUrl = process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
-  const link = `${baseUrl}/app/welcome.html?t=${signup_token}`;
-
-  const results = {};
-  if (mapped.email) {
-    results.email = await sendEmail({
-      to: mapped.email,
-      subject: 'Your Avva app is ready',
-      text: `Hi ${mapped.name}, welcome to Avva by MedFit! Get your app here: ${link}`,
-      html: `<p>Hi ${mapped.name},</p><p>Welcome to Avva — your MedFit lifestyle coach. It's where you'll get weekly grocery lists, recipes, and log your progress alongside your program.</p><p><a href="${link}">Open your app</a></p>`,
-    });
-  }
-  if (mapped.phone) {
-    results.sms = await sendSms({
-      to: mapped.phone,
-      body: `Welcome to Avva by MedFit! Your app: ${link}`,
-    });
-  }
+  const { link, results } = await sendWelcomeLink({
+    req,
+    name: mapped.name,
+    email: mapped.email,
+    phone: mapped.phone,
+    signupToken: signup_token,
+  });
 
   db.prepare(`INSERT INTO engagements (id, member_id, type, summary) VALUES (?, ?, 'signup', ?)`).run(
     nanoid(),

@@ -7,9 +7,11 @@
   "scripts": {
     "start": "node server.js",
     "seed": "node seed.js",
+    "create-admin": "node create-admin.js",
     "send-daily-messages": "node send-daily-messages.js"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

@@ -8,7 +8,29 @@ db.exec(`
 CREATE TABLE IF NOT EXISTS employers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  glp_benefit_note TEXT
+  glp_benefit_note TEXT,
+  is_direct_consumer INTEGER DEFAULT 0
+);
+
+-- MedFit staff who can log into /admin and /employer (real accounts, not
+-- the one-time member signup links). Bootstrapped with create-admin.js
+-- since there's no account yet to log in and create the first one.
+CREATE TABLE IF NOT EXISTS admin_users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- DB-backed sessions for admin_users (so logins survive a server restart,
+-- unlike an in-memory session store). Looked up by the id stored in the
+-- httpOnly session cookie — see lib/auth.js.
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  admin_user_id TEXT REFERENCES admin_users(id),
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS members (
@@ -147,4 +169,23 @@ for (const stmt of MEMBER_COLUMNS_MIGRATION) {
   }
 }
 
+// Idempotent migration for databases created before is_direct_consumer existed.
+try {
+  db.exec('ALTER TABLE employers ADD COLUMN is_direct_consumer INTEGER DEFAULT 0');
+} catch (err) {
+  if (!/duplicate column/i.test(err.message)) throw err;
+}
+
+// A single pooled "employer" bucket for people who bought the program
+// directly (no employer sponsor) — reviewed internally by MedFit staff the
+// same way a real employer's roster is, per James's direction. Every
+// direct-consumer member gets employer_id = DIRECT_CONSUMER_EMPLOYER_ID.
+const DIRECT_CONSUMER_EMPLOYER_ID = 'direct-consumers';
+db.prepare(
+  `INSERT INTO employers (id, name, glp_benefit_note, is_direct_consumer)
+   VALUES (?, 'Direct Consumers', 'Self-pay members with no employer sponsor — reviewed internally by MedFit staff.', 1)
+   ON CONFLICT(id) DO NOTHING`
+).run(DIRECT_CONSUMER_EMPLOYER_ID);
+
 module.exports = db;
+module.exports.DIRECT_CONSUMER_EMPLOYER_ID = DIRECT_CONSUMER_EMPLOYER_ID;

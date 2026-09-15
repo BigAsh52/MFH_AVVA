@@ -171,6 +171,10 @@
 
   async function load() {
     const res = await fetch(`/api/employer/${employerId}/dashboard`);
+    if (res.status === 401) {
+      location.href = '/admin/login.html?next=' + encodeURIComponent(location.pathname + location.search);
+      return;
+    }
     if (!res.ok) {
       document.querySelector('.wrap').innerHTML = '<p>Employer not found. Try appending <code>?employer=&lt;id&gt;</code> to the URL.</p>';
       return;

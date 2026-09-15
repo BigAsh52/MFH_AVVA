@@ -2,6 +2,8 @@ const { nanoid } = require('nanoid');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+const { DIRECT_CONSUMER_EMPLOYER_ID } = require('./db');
+const { hashPassword } = require('./lib/auth');
 
 const EMPLOYER_ID = 'demo-employer';
 
@@ -30,6 +32,15 @@ db.prepare('INSERT INTO employers (id, name, glp_benefit_note) VALUES (?, ?, ?)'
   'Cimarron Manufacturing Co.',
   'GLP-1 benefit continuation contingent on active lifestyle-program engagement'
 );
+
+// seed.js wipes the whole employers table above (including the Direct
+// Consumers bucket db.js creates on every boot) — put it back so a Direct
+// Consumer member can be seeded below without waiting for the next process
+// restart to recreate it.
+db.prepare(
+  `INSERT INTO employers (id, name, glp_benefit_note, is_direct_consumer)
+   VALUES (?, 'Direct Consumers', 'Self-pay members with no employer sponsor — reviewed internally by MedFit staff.', 1)`
+).run(DIRECT_CONSUMER_EMPLOYER_ID);
 
 const memberSeeds = [
   { name: 'Dana Whitfield', startWeight: 214, startFat: 38, trend: -0.9, active: true, gender: 'Female', age: 44, heightIn: 65, waist: 39, muscle: 68, rhr: 78, activity: 'lightly_active', diet: 'None', goal: 165 },
@@ -193,9 +204,37 @@ const photoBuffer = Buffer.from(PLACEHOLDER_PHOTO_JPEG_B64, 'base64');
   ).run(nanoid(), firstMember.id, p.type, p.takenOn, filePath);
 });
 
+// A direct-pay member with no employer sponsor, to demo the Direct
+// Consumers bucket admin tags people into (see db.js / routes/admin.js).
+const directMemberId = nanoid();
+const directMemberToken = nanoid(24);
+db.prepare(
+  `INSERT INTO members (id, employer_id, name, email, program_start_date, status, signup_token, starting_weight_lbs)
+   VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`
+).run(directMemberId, DIRECT_CONSUMER_EMPLOYER_ID, 'Priya Nair', 'priya.nair@example.com', daysAgoISO(14), directMemberToken, 189);
+db.prepare(`INSERT INTO vitals (id, member_id, date, weight_lbs) VALUES (?, ?, ?, ?)`).run(nanoid(), directMemberId, daysAgoISO(14), 189);
+db.prepare(`INSERT INTO engagements (id, member_id, type, summary) VALUES (?, ?, 'signup', 'Self-pay signup, no employer sponsor')`).run(nanoid(), directMemberId);
+
+// A demo staff login so the live/demo deployment has a working Admin
+// account out of the box. In real production, create the real first
+// account with `node create-admin.js` instead and skip this (or just
+// change the password afterward — this one is not a secret).
+const demoAdminEmail = 'demo@medfit.health';
+const demoAdminPassword = 'avva-demo-2026';
+if (!db.prepare('SELECT id FROM admin_users WHERE lower(email) = lower(?)').get(demoAdminEmail)) {
+  db.prepare('INSERT INTO admin_users (id, name, email, password_hash) VALUES (?, ?, ?, ?)').run(
+    nanoid(),
+    'Demo Staff',
+    demoAdminEmail,
+    hashPassword(demoAdminPassword)
+  );
+}
+
 console.log('Seeded demo data.');
 console.log('Employer ID:', EMPLOYER_ID);
 console.log('Member 9 days into their Reset, for the daily-message demo (for /app/?demo=):', earlyMemberId);
 console.log('Sample onboarded member ID (for /app/?demo=):', firstMember.id);
 console.log('Sample onboarded signup token (for /app/welcome.html?t=):', firstMember.signup_token);
 console.log('Fresh (not yet onboarded) signup token (for /app/welcome.html?t=):', newMemberToken);
+console.log('Direct-consumer demo member (for /app/?demo=):', directMemberId);
+console.log(`Admin/employer-console login: ${demoAdminEmail} / ${demoAdminPassword} (demo only — create a real account with "node create-admin.js" for production)`);

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff Login — Avva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f8fa; --surface: #ffffff; --text: #12232c; --text-muted: #5b7079;
+    --primary: #0092ca; --primary-deep: #00688f; --border: #d8e6ec; --danger: #c14a3f;
+    --font-display: "Fraunces", Georgia, serif; --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0c1a21; --surface:#122631; --text:#eaf3f7; --text-muted:#92aab4; --primary:#3fb4e0; --primary-deep:#7ecdea; --border:#23414f; --danger:#e08579; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); color:var(--text); font-family:var(--font-body); padding:20px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:32px 28px; width:100%; max-width:360px; }
+  .eyebrow { font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--primary); font-weight:700; }
+  h1 { font-family:var(--font-display); font-size:1.4rem; margin:6px 0 20px; }
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:0.82rem; color:var(--text-muted); margin-bottom:4px; }
+  .field input { width:100%; border:1px solid var(--border); border-radius:10px; padding:10px 11px; font-size:0.95rem; font-family:var(--font-body); background:var(--surface); color:var(--text); }
+  button { width:100%; border:none; border-radius:10px; padding:11px 18px; font-size:0.95rem; font-weight:700; font-family:var(--font-body); cursor:pointer; background:var(--primary); color:#fff; margin-top:6px; }
+  button:disabled { opacity:0.6; }
+  .error { color:var(--danger); font-size:0.85rem; margin-top:10px; min-height:1.2em; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="eyebrow">Avva · by MedFit</div>
+    <h1>Staff sign in</h1>
+    <form id="loginForm">
+      <div class="field"><label>Email</label><input type="email" name="email" required autofocus></div>
+      <div class="field"><label>Password</label><input type="password" name="password" required></div>
+      <button type="submit">Sign in</button>
+      <p class="error" id="errorMsg"></p>
+    </form>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const btn = e.target.querySelector('button');
+      const errorMsg = document.getElementById('errorMsg');
+      btn.disabled = true;
+      errorMsg.textContent = '';
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: fd.get('email'), password: fd.get('password') }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          errorMsg.textContent = data.error || 'Sign in failed.';
+          btn.disabled = false;
+          return;
+        }
+        const params = new URLSearchParams(location.search);
+        location.href = params.get('next') || '/admin/';
+      } catch {
+        errorMsg.textContent = 'Something went wrong — please try again.';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
