@@ -27,6 +27,22 @@
 
     <form id="onboardingForm">
       <div class="card">
+        <h3>Your employer</h3>
+        <p style="margin:0 0 10px; color:var(--text-muted); font-size:0.85rem;">This makes sure your program dashboard is tied to the right company. Don't see them listed? Just type the name in — we'll sort it out.</p>
+        <div class="field">
+          <label>Company</label>
+          <select name="employer_choice" id="employerChoice">
+            <option value="">Select your company…</option>
+            <option value="__other__">My company isn't listed</option>
+          </select>
+        </div>
+        <div class="field" id="employerOtherField" hidden>
+          <label>Company name</label>
+          <input type="text" name="employer_name_other" id="employerOtherInput" placeholder="Type your company's name">
+        </div>
+      </div>
+
+      <div class="card">
         <h3>About you</h3>
         <div class="field">
           <label>Gender</label>
@@ -89,6 +105,31 @@
   const memberId = localStorage.getItem('medfit_member_id');
   if (!memberId) location.href = 'welcome.html';
 
+  (async function loadEmployerChoices() {
+    const select = document.getElementById('employerChoice');
+    try {
+      const res = await fetch('/api/members/employers');
+      const employers = await res.json();
+      const otherOption = select.querySelector('option[value="__other__"]');
+      employers.forEach((emp) => {
+        const opt = document.createElement('option');
+        opt.value = emp.id;
+        opt.textContent = emp.name;
+        select.insertBefore(opt, otherOption);
+      });
+    } catch {
+      // If this fails, the "My company isn't listed" fill-in still works —
+      // it's the placeholder + fill-in option, not the full list, that's lost.
+    }
+  })();
+
+  document.getElementById('employerChoice').addEventListener('change', (e) => {
+    const otherField = document.getElementById('employerOtherField');
+    const isOther = e.target.value === '__other__';
+    otherField.hidden = !isOther;
+    if (!isOther) document.getElementById('employerOtherInput').value = '';
+  });
+
   document.getElementById('onboardingForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -101,6 +142,14 @@
       const v = fd.get(k);
       if (v !== '' && v != null) payload[k] = v;
     });
+
+    const employerChoice = fd.get('employer_choice');
+    if (employerChoice === '__other__') {
+      const typed = (fd.get('employer_name_other') || '').trim();
+      if (typed) payload.employer_name_other = typed;
+    } else if (employerChoice) {
+      payload.employer_id = employerChoice;
+    }
 
     const btn = e.target.querySelector('button');
     btn.disabled = true;

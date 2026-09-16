@@ -69,6 +69,7 @@ tr:last-child td { border-bottom: none; }
 
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: var(--primary-tint); color: var(--primary-deep); }
 .badge.direct { background: var(--surface-sunken); color: var(--text-muted); }
+.tab-btn .badge { margin-left: 5px; vertical-align: 1px; }
 
 .field { margin-bottom: 12px; }
 .field label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }

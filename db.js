@@ -148,6 +148,23 @@ CREATE TABLE IF NOT EXISTS daily_message_log (
   day INTEGER NOT NULL,
   sent_at TEXT DEFAULT (datetime('now'))
 );
+
+-- A member's free-text "my company isn't listed" answer at onboarding (see
+-- routes/members.js, the employer_name_other field). Staff review these in
+-- the admin panel's Requests tab and either assign the member to an
+-- existing group or create a new one — see routes/admin.js. The member is
+-- parked in the Direct Consumers bucket in the meantime, not left
+-- unassigned, so their dashboard access isn't blocked while this is
+-- pending.
+CREATE TABLE IF NOT EXISTS employer_requests (
+  id TEXT PRIMARY KEY,
+  member_id TEXT REFERENCES members(id),
+  requested_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new', -- 'new' | 'reviewed'
+  created_at TEXT DEFAULT (datetime('now')),
+  reviewed_at TEXT,
+  reviewed_by TEXT REFERENCES admin_users(id)
+);
 `);
 
 // Idempotent migration for databases created before the baseline-intake

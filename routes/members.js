@@ -1,11 +1,23 @@
 const express = require('express');
 const { nanoid } = require('nanoid');
 const db = require('../db');
+const { DIRECT_CONSUMER_EMPLOYER_ID } = require('../db');
 const { computeBmi, bmiCategory } = require('../lib/health');
 const { getDailyMessage, dayNumberFor } = require('../lib/dailyMessages');
 const { sendWelcomeLink } = require('../lib/welcome');
 
 const router = express.Router();
+
+// Public, unauthenticated list of real employer groups for the onboarding
+// "which company is your program through?" dropdown. Excludes the Direct
+// Consumers bucket — that's an internal staff concept, not something a
+// member should be able to pick themselves.
+router.get('/employers', (req, res) => {
+  const rows = db
+    .prepare('SELECT id, name FROM employers WHERE is_direct_consumer = 0 ORDER BY name ASC')
+    .all();
+  res.json(rows);
+});
 
 // Public, unauthenticated "I lost my link" resend — used by the Get the App
 // page linked from medfit.health. Always returns the same generic message
@@ -54,7 +66,28 @@ router.post('/:id/onboarding', (req, res) => {
     starting_muscle_mass_lbs,
     starting_waist_in,
     resting_heart_rate_bpm,
+    employer_id,
+    employer_name_other,
   } = req.body;
+
+  // Employer self-report: either they picked a real group from the
+  // dropdown, or their company wasn't listed and they typed it in. A typed
+  // answer always wins over a picked one if somehow both are present —
+  // it's the member telling us the list was wrong for them. The member is
+  // parked in Direct Consumers either way until staff reviews it, so
+  // nothing blocks their access in the meantime; see employer_requests in
+  // db.js and the Requests tab in the admin panel.
+  const typedEmployer = (employer_name_other || '').trim();
+  if (typedEmployer) {
+    db.prepare('UPDATE members SET employer_id = ? WHERE id = ?').run(DIRECT_CONSUMER_EMPLOYER_ID, member.id);
+    db.prepare(
+      `INSERT INTO employer_requests (id, member_id, requested_name) VALUES (?, ?, ?)`
+    ).run(nanoid(), member.id, typedEmployer);
+  } else if (employer_id) {
+    const employer = db.prepare('SELECT id FROM employers WHERE id = ? AND is_direct_consumer = 0').get(employer_id);
+    if (!employer) return res.status(400).json({ error: 'employer_id does not exist' });
+    db.prepare('UPDATE members SET employer_id = ? WHERE id = ?').run(employer_id, member.id);
+  }
 
   db.prepare(
     `UPDATE members SET

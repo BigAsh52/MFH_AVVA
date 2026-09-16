@@ -101,6 +101,59 @@
     });
   }
 
+  async function loadEmployerRequests() {
+    const rows = await api('/employer-requests?status=new');
+    const badge = document.getElementById('requestsBadge');
+    if (rows.length) {
+      badge.hidden = false;
+      badge.textContent = rows.length;
+    } else {
+      badge.hidden = true;
+    }
+    document.getElementById('requestsEmpty').style.display = rows.length ? 'none' : 'block';
+    document.getElementById('requestsBody').innerHTML = rows
+      .map((r) => {
+        const contact = [r.member_email, r.member_phone].filter(Boolean).join(' · ') || '—';
+        return `<tr data-id="${r.id}">
+          <td>${r.member_name}<div style="font-size:0.78rem; color:var(--text-muted);">${contact}</div></td>
+          <td><strong>${r.requested_name}</strong></td>
+          <td>${r.member_current_employer_name || '—'}</td>
+          <td style="font-size:0.82rem;">${r.created_at}</td>
+          <td><select class="inline-select assign-select" data-id="${r.id}"><option value="">Choose group…</option>${employerOptions()}</select></td>
+          <td><button class="btn secondary small dismiss-btn" data-id="${r.id}">Dismiss</button></td>
+        </tr>`;
+      })
+      .join('');
+
+    document.querySelectorAll('.assign-select').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        if (!sel.value) return;
+        try {
+          await api(`/employer-requests/${sel.dataset.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ action: 'assign', employer_id: sel.value }),
+          });
+          await Promise.all([loadEmployerRequests(), loadMembers(), loadEmployers()]);
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+
+    document.querySelectorAll('.dismiss-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await api(`/employer-requests/${btn.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ action: 'dismiss' }) });
+          await loadEmployerRequests();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
   async function loadStaff() {
     const rows = await api('/staff');
     document.getElementById('staffBody').innerHTML = rows
@@ -210,6 +263,6 @@
   (async function init() {
     await loadMe();
     await loadEmployers();
-    await Promise.all([loadMembers(), loadStaff()]);
+    await Promise.all([loadMembers(), loadStaff(), loadEmployerRequests()]);
   })();
 })();

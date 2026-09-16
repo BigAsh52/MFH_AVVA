@@ -23,6 +23,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="members">Members</button>
     <button class="tab-btn" data-tab="employers">Groups</button>
+    <button class="tab-btn" data-tab="requests">Requests <span class="badge" id="requestsBadge" hidden>0</span></button>
     <button class="tab-btn" data-tab="staff">Staff</button>
   </div>
 
@@ -78,6 +79,21 @@
         <tbody id="employersBody"></tbody>
       </table>
       </div>
+    </div>
+  </section>
+
+  <!-- EMPLOYER REQUESTS -->
+  <section id="tab-requests" hidden>
+    <div class="panel">
+      <div class="panel-head"><h2>Employer fill-ins to review</h2></div>
+      <p style="color:var(--text-muted); font-size:0.88rem; margin-top:-6px;">When a member's company isn't in the signup dropdown, they can type it in instead — they land in Direct Consumers until you sort it out here. Match them to an existing group, create a new one and assign them, or dismiss it once you've reached out.</p>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Member</th><th>They typed</th><th>Currently in</th><th>Submitted</th><th>Assign to existing group</th><th></th></tr></thead>
+        <tbody id="requestsBody"></tbody>
+      </table>
+      </div>
+      <p class="status-msg" id="requestsEmpty" style="display:none;">No pending employer fill-ins right now.</p>
     </div>
   </section>
 

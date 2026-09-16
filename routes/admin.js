@@ -92,6 +92,58 @@ router.patch('/employers/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Employer fill-in requests ----
+// A member typed their own company at onboarding instead of picking one
+// from the list (routes/members.js). They're parked in Direct Consumers in
+// the meantime; these rows are the review queue for staff to either match
+// them to an existing group, create a new one, or just note they reached
+// out and dismiss it.
+
+router.get('/employer-requests', (req, res) => {
+  const status = req.query.status;
+  const rows = db
+    .prepare(
+      `SELECT employer_requests.id, employer_requests.member_id, employer_requests.requested_name,
+              employer_requests.status, employer_requests.created_at,
+              members.name as member_name, members.email as member_email, members.phone as member_phone,
+              employers.name as member_current_employer_name
+       FROM employer_requests
+       JOIN members ON members.id = employer_requests.member_id
+       LEFT JOIN employers ON employers.id = members.employer_id
+       ${status ? 'WHERE employer_requests.status = ?' : ''}
+       ORDER BY employer_requests.created_at DESC`
+    )
+    .all(...(status ? [status] : []));
+  res.json(rows);
+});
+
+router.patch('/employer-requests/:id', (req, res) => {
+  const request = db.prepare('SELECT * FROM employer_requests WHERE id = ?').get(req.params.id);
+  if (!request) return res.status(404).json({ error: 'not found' });
+
+  const { action, employer_id } = req.body || {};
+  if (action === 'assign') {
+    if (!employer_id) return res.status(400).json({ error: 'employer_id is required to assign' });
+    const employer = db.prepare('SELECT id FROM employers WHERE id = ?').get(employer_id);
+    if (!employer) return res.status(400).json({ error: 'employer_id does not exist' });
+
+    db.prepare('UPDATE members SET employer_id = ? WHERE id = ?').run(employer_id, request.member_id);
+    db.prepare(`INSERT INTO engagements (id, member_id, type, summary) VALUES (?, ?, 'admin', ?)`).run(
+      nanoid(),
+      request.member_id,
+      `Assigned to a group by staff (${req.staffUser.name}) — self-reported "${request.requested_name}" at signup`
+    );
+  } else if (action !== 'dismiss') {
+    return res.status(400).json({ error: 'action must be "assign" or "dismiss"' });
+  }
+
+  db.prepare(
+    `UPDATE employer_requests SET status = 'reviewed', reviewed_at = datetime('now'), reviewed_by = ? WHERE id = ?`
+  ).run(req.staffUser.id, request.id);
+
+  res.json({ ok: true });
+});
+
 // ---- Cross-employer member roster ----
 
 router.get('/members', (req, res) => {
