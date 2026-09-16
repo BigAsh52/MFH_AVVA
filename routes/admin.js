@@ -92,6 +92,50 @@ router.patch('/employers/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Employer self-serve signup codes ----
+// For an employer buying standalone Avva access (no GLP-1 program tied to
+// it) — invoiced PEPM outside the app, no payment collected here. Staff
+// generate a code, share the resulting /join.html?code=... link with the
+// employer's HR team, and any of their employees can create their own
+// account from it — see routes/members.js self-signup. Presence of a code
+// is what turns self-serve on; clearing it turns it back off without
+// losing the employer record.
+const SIGNUP_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'; // no 0/O/1/I/L — easier to read back over the phone
+function generateSignupCode() {
+  let code = '';
+  for (let i = 0; i < 8; i++) code += SIGNUP_CODE_ALPHABET[Math.floor(Math.random() * SIGNUP_CODE_ALPHABET.length)];
+  return code;
+}
+
+router.post('/employers/:id/signup-code', (req, res) => {
+  const employer = db.prepare('SELECT * FROM employers WHERE id = ?').get(req.params.id);
+  if (!employer) return res.status(404).json({ error: 'not found' });
+  if (employer.is_direct_consumer) {
+    return res.status(400).json({ error: 'The Direct Consumers bucket cannot have a signup link.' });
+  }
+
+  // Collisions are astronomically unlikely at 8 chars from a 32-char
+  // alphabet, but the unique index is the real guarantee — retry a couple
+  // times on the off chance, rather than fail the request.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateSignupCode();
+    try {
+      db.prepare('UPDATE employers SET signup_code = ? WHERE id = ?').run(code, employer.id);
+      return res.json({ signup_code: code });
+    } catch (err) {
+      if (!/UNIQUE constraint failed/i.test(err.message)) throw err;
+    }
+  }
+  res.status(500).json({ error: 'Could not generate a unique signup code — try again.' });
+});
+
+router.delete('/employers/:id/signup-code', (req, res) => {
+  const employer = db.prepare('SELECT * FROM employers WHERE id = ?').get(req.params.id);
+  if (!employer) return res.status(404).json({ error: 'not found' });
+  db.prepare('UPDATE employers SET signup_code = NULL WHERE id = ?').run(employer.id);
+  res.json({ ok: true });
+});
+
 // ---- Employer fill-in requests ----
 // A member typed their own company at onboarding instead of picking one
 // from the list (routes/members.js). They're parked in Direct Consumers in

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join Avva — by MedFit</title>
+<meta name="theme-color" content="#0092ca">
+<link rel="icon" href="/app/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/style.css">
+<style>
+  .hero { text-align: center; padding: 36px 20px 8px; }
+  .hero img { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 6px 18px rgba(0,0,0,0.15); }
+  .hero h1 { font-family: var(--font-display); font-size: 1.7rem; margin: 14px 0 6px; }
+  .hero p { color: var(--text-muted); margin: 0; }
+  .status-msg { font-size: 0.88rem; margin-top: 10px; min-height: 1.2em; }
+  .status-msg.ok { color: var(--primary-deep); }
+  .status-msg.err { color: var(--danger); }
+  #loadingState, #errorState, #formState, #doneState { display: none; }
+  #loadingState.active, #errorState.active, #formState.active, #doneState.active { display: block; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="hero">
+    <img src="/app/icons/icon-512.png" alt="Avva app icon">
+    <h1>Join Avva</h1>
+    <p id="heroSub">by MedFit — your lifestyle coach, right on your phone.</p>
+  </div>
+
+  <section class="screen" style="padding-top:10px;">
+    <div class="card" id="loadingState">
+      <p style="color:var(--text-muted); margin:0;">Checking your signup link…</p>
+    </div>
+
+    <div class="card" id="errorState">
+      <h3>This link isn't active</h3>
+      <p style="color:var(--text-muted); margin:0;">This signup link is missing, expired, or no longer active. Check with your employer for the current link, or if you're a MedFit GLP-1 member, <a href="/get-app.html">get the app here</a> instead.</p>
+    </div>
+
+    <div class="card" id="formState">
+      <h3 id="employerHeading">Create your account</h3>
+      <p style="color:var(--text-muted); margin:0 0 14px; font-size:0.88rem;" id="employerSub"></p>
+      <form id="signupForm">
+        <div class="field">
+          <label>Full name</label>
+          <input type="text" name="name" required>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label>Phone</label>
+          <input type="tel" name="phone" placeholder="(405) 555-0100">
+        </div>
+        <p style="color:var(--text-muted); font-size:0.78rem; margin:-4px 0 14px;">Enter at least one — that's how we'll send your app link if you ever need it again.</p>
+        <button class="btn" type="submit">Create my account</button>
+      </form>
+      <p class="status-msg" id="signupStatus"></p>
+    </div>
+
+    <div class="card" id="doneState">
+      <h3>You're in!</h3>
+      <p style="color:var(--text-muted); margin:0 0 14px;">Next, let's capture your starting point so your progress tracking has something to measure against.</p>
+      <a class="btn" id="continueLink" href="#" style="text-decoration:none;">Set up my profile</a>
+    </div>
+  </section>
+</div>
+<script>
+  const code = new URLSearchParams(location.search).get('code');
+  const states = ['loadingState', 'errorState', 'formState', 'doneState'];
+  function show(id) {
+    states.forEach((s) => document.getElementById(s).classList.toggle('active', s === id));
+  }
+
+  show('loadingState');
+
+  if (!code) {
+    show('errorState');
+  } else {
+    fetch('/api/members/employer-by-code/' + encodeURIComponent(code))
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((employer) => {
+        document.getElementById('heroSub').textContent = `Your access through ${employer.name}.`;
+        document.getElementById('employerHeading').textContent = `Join Avva through ${employer.name}`;
+        document.getElementById('employerSub').textContent = 'A couple of quick details and your app will be ready.';
+        show('formState');
+      })
+      .catch(() => show('errorState'));
+  }
+
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const name = (fd.get('name') || '').trim();
+    const email = (fd.get('email') || '').trim();
+    const phone = (fd.get('phone') || '').trim();
+    const statusEl = document.getElementById('signupStatus');
+
+    if (!email && !phone) {
+      statusEl.className = 'status-msg err';
+      statusEl.textContent = 'Please enter an email or a phone number.';
+      return;
+    }
+
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    statusEl.className = 'status-msg';
+    statusEl.textContent = 'Creating your account…';
+
+    try {
+      const res = await fetch('/api/members/self-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, phone, signup_code: code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong — please try again.');
+
+      localStorage.setItem('medfit_member_id', data.member_id);
+      localStorage.setItem('medfit_member_name', data.name);
+      document.getElementById('continueLink').href = '/app/onboarding.html';
+      show('doneState');
+    } catch (err) {
+      statusEl.className = 'status-msg err';
+      statusEl.textContent = err.message;
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

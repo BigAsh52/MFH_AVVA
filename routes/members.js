@@ -19,6 +19,59 @@ router.get('/employers', (req, res) => {
   res.json(rows);
 });
 
+// Public, unauthenticated lookup for the employer self-serve signup link
+// (public/site/join.html?code=...). Used to show the employer's name before
+// someone fills out the signup form, and to validate the code again server
+// side at submit time. Returns only what's safe to show a stranger with the
+// link — never anything else about the employer or its roster.
+router.get('/employer-by-code/:code', (req, res) => {
+  const employer = db
+    .prepare('SELECT id, name FROM employers WHERE signup_code = ? AND is_direct_consumer = 0')
+    .get((req.params.code || '').trim().toUpperCase());
+  if (!employer) return res.status(404).json({ error: 'not found' });
+  res.json(employer);
+});
+
+// Public, unauthenticated self-serve signup for an employer that bought
+// standalone Avva access (no GLP-1 program / no Remedora checkout for
+// this person) — see the signup-code endpoints in routes/admin.js. Creates
+// the member immediately (no staff review needed — the code itself is the
+// proof this employer authorized it) and sends the same welcome link as
+// every other path, but also returns the member id directly so the join
+// page can drop them straight into onboarding without waiting on email/SMS.
+router.post('/self-signup', async (req, res) => {
+  const { name, email, phone, signup_code } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: 'name is required' });
+  if (!email && !phone) return res.status(400).json({ error: 'email or phone is required' });
+  if (!signup_code || !signup_code.trim()) return res.status(400).json({ error: 'signup_code is required' });
+
+  const employer = db
+    .prepare('SELECT id, name FROM employers WHERE signup_code = ? AND is_direct_consumer = 0')
+    .get(signup_code.trim().toUpperCase());
+  if (!employer) return res.status(400).json({ error: 'That signup link is no longer valid — check with your employer for the current one.' });
+
+  const id = nanoid();
+  const signup_token = nanoid(24);
+  const program_start_date = new Date().toISOString().slice(0, 10);
+
+  db.prepare(
+    `INSERT INTO members (id, employer_id, name, email, phone, program_start_date, status, signup_token)
+     VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`
+  ).run(id, employer.id, name.trim(), email || null, phone || null, program_start_date, signup_token);
+
+  db.prepare(`INSERT INTO engagements (id, member_id, type, summary) VALUES (?, ?, 'signup', ?)`).run(
+    nanoid(),
+    id,
+    `Self-registered via ${employer.name}'s signup link`
+  );
+
+  // Fire the welcome email/text too, same as every other signup path — so
+  // they have the link on record even if they close this tab mid-onboarding.
+  sendWelcomeLink({ req, name: name.trim(), email, phone, signupToken: signup_token }).catch(() => {});
+
+  res.json({ member_id: id, name: name.trim(), employer_name: employer.name });
+});
+
 // Public, unauthenticated "I lost my link" resend — used by the Get the App
 // page linked from medfit.health. Always returns the same generic message
 // regardless of whether a match was found, so this can't be used to probe

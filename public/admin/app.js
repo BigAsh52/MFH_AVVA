@@ -37,6 +37,22 @@
     }
   }
 
+  function signupCodeCell(e) {
+    if (e.is_direct_consumer) return '—';
+    if (!e.signup_code) {
+      return `<button class="btn secondary small enable-signup-btn" data-id="${e.id}">Enable</button>`;
+    }
+    const link = `${location.origin}/join.html?code=${e.signup_code}`;
+    return `
+      <div style="font-size:0.82rem;">
+        <code>${e.signup_code}</code>
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <button class="btn secondary small copy-signup-link-btn" data-link="${link}">Copy link</button>
+          <button class="btn secondary small disable-signup-btn" data-id="${e.id}">Turn off</button>
+        </div>
+      </div>`;
+  }
+
   async function loadEmployers() {
     employers = await api('/employers');
     document.getElementById('inviteEmployerSelect').innerHTML = employerOptions();
@@ -48,9 +64,50 @@
           <td>${e.is_direct_consumer ? '<span class="badge direct">Direct consumers</span>' : '<span class="badge">Employer group</span>'}</td>
           <td>${e.member_count}</td>
           <td><a href="/employer/?employer=${e.id}" target="_blank">Open dashboard →</a></td>
+          <td>${signupCodeCell(e)}</td>
         </tr>`
       )
       .join('');
+
+    document.querySelectorAll('.enable-signup-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await api(`/employers/${btn.dataset.id}/signup-code`, { method: 'POST' });
+          await loadEmployers();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll('.disable-signup-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Turn off self-serve signup for this employer? The current link will stop working.')) return;
+        btn.disabled = true;
+        try {
+          await api(`/employers/${btn.dataset.id}/signup-code`, { method: 'DELETE' });
+          await loadEmployers();
+        } catch (err) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll('.copy-signup-link-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.link);
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => (btn.textContent = original), 1500);
+        } catch {
+          prompt('Copy this link:', btn.dataset.link);
+        }
+      });
+    });
   }
 
   async function loadMembers(q) {

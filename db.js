@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS employers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   glp_benefit_note TEXT,
-  is_direct_consumer INTEGER DEFAULT 0
+  is_direct_consumer INTEGER DEFAULT 0,
+  signup_code TEXT
 );
 
 -- MedFit staff who can log into /admin and /employer (real accounts, not
@@ -196,6 +197,22 @@ try {
 } catch (err) {
   if (!/duplicate column/i.test(err.message)) throw err;
 }
+
+// Idempotent migration for databases created before signup_code existed —
+// the employer-driven self-serve signup link (see routes/members.js
+// self-signup and routes/admin.js signup-code endpoints). Employers with a
+// standalone (non-GLP) Avva arrangement get one so their employees can join
+// themselves without a Remedora checkout, billed to the employer separately
+// (PEPM invoicing) rather than through the app.
+try {
+  db.exec('ALTER TABLE employers ADD COLUMN signup_code TEXT');
+} catch (err) {
+  if (!/duplicate column/i.test(err.message)) throw err;
+}
+// A plain (non-partial) unique index still allows unlimited NULLs in
+// SQLite — only non-null signup_code values collide — so this is safe for
+// the many employers that never enable self-serve signup.
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_employers_signup_code ON employers(signup_code)');
 
 // A single pooled "employer" bucket for people who bought the program
 // directly (no employer sponsor) — reviewed internally by MedFit staff the

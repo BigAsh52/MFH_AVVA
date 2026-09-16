@@ -77,6 +77,15 @@
     </div>
 
     <div class="card">
+      <h3>Have an employer signup code?</h3>
+      <p style="color:var(--text-muted); margin:0 0 10px;">If your employer offers Avva directly and gave you a code instead of a link, enter it here.</p>
+      <form id="codeForm" style="display:flex; gap:8px;">
+        <input type="text" name="code" placeholder="e.g. AB3D9KQZ" style="flex:1; border:1px solid var(--border); border-radius:10px; padding:10px 11px; font-size:0.95rem; background:var(--surface); color:var(--text); text-transform:uppercase;" required>
+        <button class="btn" type="submit" style="width:auto; padding:0 18px;">Go</button>
+      </form>
+    </div>
+
+    <div class="card">
       <h3>How "Get the app" works</h3>
       <p style="color:var(--text-muted); margin:0 0 10px;">Avva is a web app, not a download from the App Store or Google Play — opening your personal link and adding it to your Home Screen gives you the same one-tap icon and full-screen experience as a regular app.</p>
       <div class="tabs">
@@ -282,6 +291,12 @@
   if (/android/i.test(navigator.userAgent)) {
     document.querySelector('.tab-btn[data-os="android"]').click();
   }
+
+  document.getElementById('codeForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = new FormData(e.target).get('code').trim();
+    if (code) location.href = '/join.html?code=' + encodeURIComponent(code);
+  });
 
   document.getElementById('resendForm').addEventListener('submit', async (e) => {
     e.preventDefault();
